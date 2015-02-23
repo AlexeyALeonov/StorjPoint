@@ -1,8 +1,10 @@
-import pickle
+# coding: utf-8
+
 import time
 import logging
 import json
 import io
+import bz2
 
 from BlobTree import Blob 
 from BlobTree import Tree 
@@ -13,9 +15,33 @@ class StorjFS:
         if hash==-1 or key==-1:
             self.root=Tree(0o755)
         else:
-            self.root=pickle.load(storj.download(hash,key))
-        #self.root=json.load(hoge)
+            data=bz2.decompress(storj.download(hash,key))
+            self.load(data)
 
+    def load(self,jtext):
+        blobs=[]
+        trees=[]
+
+        objs=json.loads(jtext)
+        for obj in objs:
+            print("!!!")
+            print(obj)
+            if obj['type']=='tree':
+                tree=Tree.fromJson(obj)
+                trees.append(tree)
+                blobs.insert(obj['no'],tree)
+            if obj['type']=='blob':
+                blob=Blob.fromJson(obj)
+                blobs.insert(obj['no'],blob)
+
+        for t in trees:
+            for k,v in t.files.items():
+                print(k)
+                print(v)
+                print(blobs[v])
+                t.files[k]=blobs[v]
+        self.root=blobs[0]
+ 
     def __downloadByBlob(self,blob):
         if blob.isDir():
             raise Exception('permission denied')
@@ -24,8 +50,8 @@ class StorjFS:
         return storj.download(blob.hash,blob.passwords)
 
     def save(self,inode,dirInfo):
-        #json.dump(self.root)
-        return storj.upload("storjfs.dat",piclke.dump(self.root))
+        data=bz2.compress(self.dump())
+        return storj.upload("storjfs.dat",data)
 
     def __searchParentTree(self,path):
         dirs=path.split('/')
@@ -98,6 +124,29 @@ class StorjFS:
         if blob.counter==0 and blob.isDir()==False:
             storj.delete(blob.hash)
 
+    def __listBlobs(self,blob,trees):
+        if blob not in trees:
+            trees.append(blob)
+            if blob.isDir():
+                for b in blob.files.values():
+                    self.__listBlobs(b,trees)
+
+    def dump(self):
+        trees=[]
+        self.__listBlobs(fs.root,trees)
+        return StorjFSEncoder().encode(trees)
+
+
+
+class StorjFSEncoder(json.JSONEncoder):
+    def default(self,o):
+        if isinstance(o,Blob) or isinstance(o,Tree):
+            return o.getDict()
+        return json.JSONEncoder.default(self, o)
+
+
+
+
 if __name__ == '__main__':
     fs=StorjFS()
     fs.createFile("/test.txt",b'test data')
@@ -114,6 +163,9 @@ if __name__ == '__main__':
     for f in root.keys():
         print(f)
     fs.unlink("/moe/test2.txt")
+    j=fs.dump()
+    print(j)
+    fs.load(j)
     print("ls /moe")
     root=fs.readDir("/moe")
     for f in root.keys():
