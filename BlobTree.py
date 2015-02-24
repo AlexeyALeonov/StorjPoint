@@ -58,6 +58,28 @@ class Inode:
     def isExecutable(self):
         return self.permission & S_IXUSR !=0
 
+#TBD
+    def setReadable(self,setbit):
+        if setbit:
+          self.permission= self.permission | S_IRUSR
+        else:
+          self.permission= self.permission & ~(S_IRUSR)
+
+#TBD
+    def setWritable(self,setbit):
+        if setbit:
+          self.permission= self.permission | S_IWUSR
+        else:
+          self.permission= self.permission & ~(S_IWUSR)
+
+#TBD
+    def setExecutable(self,setbit):
+        if setbit:
+          self.permission= self.permission | S_IXUSR
+        else:
+          self.permission= self.permission & ~(S_IXUSR)
+
+
     def getDict(self):
         return {'user':self.user,'group':self.group,'permission':self.permission,
                 'ctime':self.ctime,'mtime':self.mtime,'atime':self.atime,
@@ -100,21 +122,19 @@ class Tree(Inode):
         self.files={".":self,"..":parent}
 
     def addFile(self,name,blob):
-        if self.isWritable()==False:
-            raise Exception('permission denied')
+        if not self.isWritable():
+            raise PermissionError()
         blob.counter=blob.counter+1
-        if name in self.files:
-            blob.ctime=self.files[name].ctime
         self.files[name]=blob
 
     def unlink(self,name):
-        if self.isWritable()==False:
-            raise Exception('permission denied')
+        if not self.isWritable():
+            raise PermissionError()
         blob=self.files[name]
         if blob==None:
-            raise Exception('file not found')
-        if blob.isWritable()==False:
-            raise Exception('permission denied')
+            raise FileNotFoundError()
+        if not blob.isWritable():
+            raise PermissionError()
         blob.counter=blob.counter-1
         del(self.files[name])
         return blob

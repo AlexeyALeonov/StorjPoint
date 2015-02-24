@@ -45,7 +45,7 @@ class StorjFS:
     def __downloadByBlob(self,blob):
         if blob.isDir():
             raise Exception('permission denied')
-        if blob.isReadable()==False:
+        if not blob.isReadable():
             raise Exception('permission denied')
         return storj.download(blob.hash,blob.passwords)
 
@@ -63,17 +63,23 @@ class StorjFS:
         if len(dirs)>0:
             name=dirs[len(dirs)-1]
             for p in dirs[0:-1]:
-                tree=tree.files[p]
-                if tree==None:
+                if p not in tree.files:
                       return (None,None)
+                tree=tree.files[p]
         return (tree,name)
 
     def __getFilename(self,path):
         dirs=path.split('/')
         return dirs[len(dirs)-1]
+
+    def __deleteFromStorj(self,blob):
+        if blob.counter==0 and not blob.isDir():
+            storj.delete(blob.hash)
         
-    def __getBlob(self,path):
+    def getBlob(self,path):
         (parent,name)=self.__searchParentTree(path)
+        if parent==None and name==None:
+            raise FileNotFoundError()
         if name==None:
             blob=parent
         else:
@@ -84,22 +90,28 @@ class StorjFS:
     def hardlink(self,fromm,to):
         (parrent,name)=self.__searchParentTree(to)
         toDir=parent.file[name]
-        if toDir.isDir()==False:
-            raise Exception('permission denied')
+        if not toDir.isDir():
+            raise PermissionError()
         (parent,name)=self.__searchParentTree(fromm)
         fromBlob=parent[name]
         if fromBlob==None:
-            raise Exception('file not found')
+            raise FileNotFoundError()
         toDir.addFile(name,fromBlob)
 
     def setPermission(self,path,permission):
-        self.__getBlob(path).setPermission(permission)
+        self.getBlob(path).setPermission(permission)
 
-    def createFile(self,path,data,permission=0o755):
+    def updateFile(self,path,data,permission=0o755):
         (parent,name)=self.__searchParentTree(path)
+        pre=self.getBlob(path)
+        if pre!=None:
+            permission=pre.permission
+            self.__deleteFromStorj(pre)
+            parent.unlink(name)
         (hash,key)=storj.upload(name,data)
         blob=Blob(hash,len(data),permission,key)
         parent.addFile(name,blob)
+
  
     def createDir(self,path,permission=0o755):
         (parent,name)=self.__searchParentTree(path)
@@ -107,22 +119,35 @@ class StorjFS:
         parent.addFile(name,tree)
 
     def readFile(self,path):
-        blob=self.__getBlob(path)
+        blob=self.getBlob(path)
+        if blob.isDir():
+            raise IsADirectoryError()
         return self.__downloadByBlob(blob)
 
     def readDir(self,path):
-        tree=self.__getBlob(path)
-        if tree.isDir()==False:
-            raise Exception('permission denied')
-        if tree.isExecutable()==False:
-            raise Exception('permission denied')
+        tree=self.getBlob(path)
+        if not tree.isDir():
+            raise NotADirectoryError()
+        if not tree.isExecutable():
+            raise PermissionError()
         return tree.files
 
     def unlink(self,path):
         (parent,name)=self.__searchParentTree(path)
         blob=parent.unlink(name)
-        if blob.counter==0 and blob.isDir()==False:
-            storj.delete(blob.hash)
+        self.__deleteFromStorj(blob)
+
+
+    def move(self,fromm,dest,overwrite=True):
+        (destParent,destName)=self.__searchParentTree(dest)
+        if destParent.files[destName]!=None:
+            if not overwite:
+                raise FileExistsError()
+            blob=destParent.unlink(destName)
+            self.__deleteFromStorj(blob)
+        (fromParent,fromName)=self.__searchParentTree(fromm)
+        destParent.addFile(fromParent.files[fromName])
+        fromParent.unlink(fromName)
 
     def __listBlobs(self,blob,trees):
         if blob not in trees:
