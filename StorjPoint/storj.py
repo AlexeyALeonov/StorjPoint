@@ -6,11 +6,13 @@ import io
 import struct
 import binascii
 import functools
+import urllib.request
 
 token=""
 NODE_URL="http://node1.metadisk.org"
 
 def upload(path,data):
+    path=urllib.parse.quote(path,encoding='utf-8')
     byteio=io.BytesIO(data)
     r = requests.post(NODE_URL+'/api/upload', files={'file':(path,byteio)},
             data={'token':token})

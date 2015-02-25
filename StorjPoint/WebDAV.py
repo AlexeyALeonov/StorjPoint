@@ -4,6 +4,9 @@ from flask import Flask,request,make_response
 import StorjFS
 import DAVXml
 from functools import wraps
+import urllib.request
+import re
+import logging
 
 app = Flask(__name__)
 host='192.168.1.22'
@@ -12,18 +15,21 @@ root="root"
 fs=StorjFS.StorjFS()
 xml=DAVXml.DAVXml(host,root,fs)
 
+#logging.basicConfig(filename='WebDAV.log',level=logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG)
+
+
 def __withException(func):
     @wraps(func)
-    def wrapper(*args, **kwargs):
+    def wrapper(path):
         try:
-            return func(*args, **kwargs)
+            path = re.sub(r'^'+root, '', path)
+            path=urllib.parse.unquote(path,encoding='utf-8')
+            return func(path)
         except FileNotFoundError:
             return '',404
         except PermissionError:
             return '',403
-#        except Exception as e:
-#            print(e)
-#            return '',500
     return wrapper
 
 
@@ -54,8 +60,7 @@ def proppatch(path):
 @app.route('/<path:path>',methods=['MKCOL'])
 @__withException
 def mkcol(path):
-    path.replace(root,'')
-    fs.crateDir(path)
+    fs.createDir(path)
     return '',201
 
 @app.route('/', defaults={'path': ''},methods=['COPY'])
@@ -69,11 +74,11 @@ def copy(path):
 @__withException
 def move(path):
     dest=request.headers.get('Destination')
-    dest.replace(root,'')
-    overwrite=request.headers.get('Overwrite')
-    path.replace(root,'')
+    dest = re.sub(r'^http://'+host+'/'+root, '', dest)
+    dest=urllib.parse.unquote(dest,encoding='utf-8')
+    overwrite=request.headers.get('Overwrite')=='T'
     try:
-        fs.move(path,dest,overwrite=='T')
+        fs.move(path,dest,overwrite)
     except FileExistsError:
         return '',412
     return '',201
@@ -82,7 +87,6 @@ def move(path):
 @app.route('/<path:path>',methods=['GET'])
 @__withException
 def get(path):
-    path.replace(root,'')
     return fs.readFile(path),200
 
 
@@ -96,23 +100,26 @@ def head(path):
 @app.route('/<path:path>',methods=['POST'])
 @__withException
 def post(path):
-    path.replace(root,'')
-    return fs.updateFile(path,request.data),200
+    existFile=fs.updateFile(path,request.data)
+    if existFile:
+        return '',204
+    else:
+        return '',201
 
 @app.route('/', defaults={'path': ''},methods=['PUT'])
 @app.route('/<path:path>',methods=['PUT'])
 @__withException
 def put(path):
-    path.replace(root,'')
-    return fs.updateFile(path,request.data),200
+    existFile=fs.updateFile(path,request.data)
+    if existFile:
+        return '',204
+    else:
+        return '',201
 
 app.route('/', defaults={'path': ''},methods=['DELETE'])
 @app.route('/<path:path>',methods=['DELETE'])
 @__withException
 def delete(path):
-    path.replace(root,'')
     fs.unlink(path)
     return '',204
 
-
-app.run(host=host,port=port,debug=True)

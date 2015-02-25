@@ -2,6 +2,8 @@
 
 from lxml import etree
 import time
+import urllib.request
+import logging
 
 ReadOnly = 0x00000001
 Hidden = 0x00000002
@@ -17,16 +19,24 @@ PosixSemantics = 0x01000000
 D='{DAV:}'
 M='{urn:schemas-microsoft.com:}'
 
+#logging.basicConfig(filename='DAVXml.log',level=logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG)
+
+
 class DAVXml:
     def __init__(self,host,root,fs):
         self.host=host
         self.root=root
         self.fs=fs
 
+    def __toUrl(self,path):
+        return 'http://'+urllib.parse.quote(
+            self.host+'/'+self.root+path,encoding='utf-8')
+
+
     def __propstatRoot(self,multistatus):
         response = etree.SubElement(multistatus, D+'response')      
-        etree.SubElement(response, D+'href').text=\
-            'http://'+self.host+'/'+self.root
+        etree.SubElement(response, D+'href').text=self.__toUrl('')
         propstat = etree.SubElement(response, D+'propstat')      
         prop = etree.SubElement(propstat, D+'prop')      
         resourcetype = etree.SubElement(prop, D+'resourcetype')      
@@ -36,7 +46,7 @@ class DAVXml:
         etree.SubElement(propstat, D+'status').text='HTTP/1.1 200 OK'
 
     def __gmtime(self,sec):
-        return strftime('%a, %d %b %Y %H:%M:%S GMT', sec)
+        return time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime(sec))
 
     def __etime(self,sec):
         return int(time.mktime(time.strptime(p.text,'%a, %d %b %Y %H:%M:%S GMT')))
@@ -54,32 +64,32 @@ class DAVXml:
     def propfind(self,path,depth):
         multistatus = etree.Element(D+'multistatus',nsmap=\
             {'D': 'DAV:','M': 'urn:schemas-microsoft.com:'})
-        print(path+" "+self.host+" "+self.root)
-        if path==self.root: 
+        if path=='': 
+            blob=self.fs.getBlob('/')
             self.__propstatRoot(multistatus)
         else:
-            if path.startswith(path):
-                path.replace(self.root,'')
-                blob=self.fs.getBlob(path)
-                self.__propfindFile(blob,multstatus)
-        if depth==1:
-          for b in blob.files.keys():
-              self.__propstatFile(b,multistatus)
-        print( etree.tostring(multistatus, encoding="utf-8",xml_declaration=True))
-        return  etree.tostring(multistatus, encoding="utf-8",xml_declaration=True)
+            blob=self.fs.getBlob(path)
+            self.__propfindFile(blob,path,multistatus)
+        if depth=='1':
+            for [k,v] in blob.files.items():
+                if k!='.' and k!='..':
+                    self.__propfindFile(v,'/'+k,multistatus)
+        result=\
+            etree.tostring(multistatus, encoding="utf-8",xml_declaration=True)
+        logging.debug(result)
+        return  result
 
-    def __propfindFile(self,blob,multistatus):
+    def __propfindFile(self,blob,path,multistatus):
             response = etree.SubElement(multistatus, D+'response')      
-            if blob.isDir():
-                resourcetype = etree.SubElement(prop, D+'resourcetype')      
-                etree.SubElement(resourcetype, D+'collection')      
-            etree.SubElement(response, D+'href').text=path
+            etree.SubElement(response, D+'href').text=self.__toUrl(path)
             propstat = etree.SubElement(response, D+'propstat')      
             prop = etree.SubElement(propstat, D+'prop')      
             if blob.isDir():
+                resourcetype = etree.SubElement(prop, D+'resourcetype')      
+                etree.SubElement(resourcetype, D+'collection')      
                 etree.SubElement(prop, D+'getcontentlength').text='0'
             else:
-                etree.SubElement(prop, D+'getcontentlength').text=blob.size
+                etree.SubElement(prop, D+'getcontentlength').text=str(blob.size)
             etree.SubElement(prop, D+'getcontenttype').text=\
                 'application/octet-stream'
             etree.SubElement(prop, M+'Win32CreationTime').text=\
@@ -89,15 +99,14 @@ class DAVXml:
             etree.SubElement(prop, M+'Win32LastModifiedTime').text=\
                 self.__gmtime(blob.mtime)
             etree.SubElement(prop, M+'Win32FileAttributes').text=\
-                self.attribute(blob)
+                self.__attribute(blob)
             etree.SubElement(propstat, D+'status').text='HTTP/1.1 200 OK'
 
     def proppatch(self,path,xml):
         root=etree.fromstring(xml)
-        path.replace(self.root,'')
         blob=self.fs.getBlob(path)
 
-        for p in root.find('.//'+D+'{DAV:}prop'):
+        for p in root.find('.//'+D+'prop'):
             if p.tag==M+'Win32CreationTime':
                 blob.ctime=self.__etime(p.text)
             if p.tag==M+'Win32LastAccessTime':
@@ -116,6 +125,3 @@ class DAVXml:
                               | BlobTree.S_IWOTH
 
         return self.propfind(path,0)
-
-            
-#xml=b'<?xml version="1.0" encoding="utf-8" ?><D:propertyupdate xmlns:D="DAV:" xmlns:Z="urn:schemas-microsoft-com:"><D:set><D:prop><Z:Win32CreationTime>Sat, 21 Feb 2015 13:03:47 GMT</Z:Win32CreationTime><Z:Win32LastAccessTime>Sat, 21 Feb 2015 13:03:47 GMT</Z:Win32LastAccessTime><Z:Win32LastModifiedTime>Sat, 21 Feb 2015 13:03:47 GMT</Z:Win32LastModifiedTime><Z:Win32FileAttributes>00000020</Z:Win32FileAttributes></D:prop></D:set></D:propertyupdate>'

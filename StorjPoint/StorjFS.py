@@ -5,10 +5,14 @@ import logging
 import json
 import io
 import bz2
+import logging
 
 from BlobTree import Blob 
 from BlobTree import Tree 
 import storj
+
+#logging.basicConfig(filename='StorjFS.log',level=logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG)
 
 class StorjFS:
     def __init__(self,hash=-1,key=-1):
@@ -24,8 +28,6 @@ class StorjFS:
 
         objs=json.loads(jtext)
         for obj in objs:
-            print("!!!")
-            print(obj)
             if obj['type']=='tree':
                 tree=Tree.fromJson(obj)
                 trees.append(tree)
@@ -36,9 +38,6 @@ class StorjFS:
 
         for t in trees:
             for k,v in t.files.items():
-                print(k)
-                print(v)
-                print(blobs[v])
                 t.files[k]=blobs[v]
         self.root=blobs[0]
  
@@ -54,19 +53,20 @@ class StorjFS:
         return storj.upload("storjfs.dat",data)
 
     def __searchParentTree(self,path):
+        if path=='/':
+            return (self.root,None)
         dirs=path.split('/')
         while '' in dirs:
             dirs.remove('')
-
-        tree=self.root
-        name=None
-        if len(dirs)>0:
-            name=dirs[len(dirs)-1]
-            for p in dirs[0:-1]:
-                if p not in tree.files:
-                      return (None,None)
-                tree=tree.files[p]
-        return (tree,name)
+        preTree=tree=self.root
+        for p in dirs[0:-1]:
+            if p not in tree.files:
+                raise FileNotFoundError()
+            preTree=tree
+            tree=tree.files[p]
+            if not tree.isDir():
+                raise FileNotFoundError()
+        return (preTree,dirs[len(dirs)-1])
 
     def __getFilename(self,path):
         dirs=path.split('/')
@@ -78,11 +78,11 @@ class StorjFS:
         
     def getBlob(self,path):
         (parent,name)=self.__searchParentTree(path)
-        if parent==None and name==None:
-            raise FileNotFoundError()
         if name==None:
             blob=parent
         else:
+            if name not in parent.files:
+                raise FileNotFoundError()
             blob=parent.files[name]
         blob.updateAtime()
         return blob
@@ -103,15 +103,17 @@ class StorjFS:
 
     def updateFile(self,path,data,permission=0o755):
         (parent,name)=self.__searchParentTree(path)
-        pre=self.getBlob(path)
-        if pre!=None:
+        existFile=False
+        if name in parent.files:
+            existFile=True
+            pre=parent.files[name]
             permission=pre.permission
             self.__deleteFromStorj(pre)
             parent.unlink(name)
         (hash,key)=storj.upload(name,data)
         blob=Blob(hash,len(data),permission,key)
         parent.addFile(name,blob)
-
+        return existFile
  
     def createDir(self,path,permission=0o755):
         (parent,name)=self.__searchParentTree(path)
@@ -140,13 +142,13 @@ class StorjFS:
 
     def move(self,fromm,dest,overwrite=True):
         (destParent,destName)=self.__searchParentTree(dest)
-        if destParent.files[destName]!=None:
+        if destName in destParent.files:
             if not overwite:
                 raise FileExistsError()
             blob=destParent.unlink(destName)
             self.__deleteFromStorj(blob)
         (fromParent,fromName)=self.__searchParentTree(fromm)
-        destParent.addFile(fromParent.files[fromName])
+        destParent.addFile(destName,fromParent.files[fromName])
         fromParent.unlink(fromName)
 
     def __listBlobs(self,blob,trees):
