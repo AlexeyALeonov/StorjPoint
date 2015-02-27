@@ -19,10 +19,6 @@ PosixSemantics = 0x01000000
 D='{DAV:}'
 M='{urn:schemas-microsoft.com:}'
 
-#logging.basicConfig(filename='DAVXml.log',level=logging.DEBUG)
-logging.basicConfig(level=logging.DEBUG)
-
-
 class DAVXml:
     def __init__(self,host,root,fs):
         self.host=host
@@ -64,6 +60,7 @@ class DAVXml:
     def propfind(self,path,depth):
         multistatus = etree.Element(D+'multistatus',nsmap=\
             {'D': 'DAV:','M': 'urn:schemas-microsoft.com:'})
+        print(path)
         if path=='': 
             blob=self.fs.getBlob('/')
             self.__propstatRoot(multistatus)
@@ -72,11 +69,11 @@ class DAVXml:
             self.__propfindFile(blob,path,multistatus)
         if depth=='1':
             for [k,v] in blob.files.items():
+                print(k)
                 if k!='.' and k!='..':
                     self.__propfindFile(v,'/'+k,multistatus)
         result=\
             etree.tostring(multistatus, encoding="utf-8",xml_declaration=True)
-        logging.debug(result)
         return  result
 
     def __propfindFile(self,blob,path,multistatus):
@@ -125,3 +122,28 @@ class DAVXml:
                               | BlobTree.S_IWOTH
 
         return self.propfind(path,0)
+
+    def lock(self,path,xml):
+        root=etree.fromstring(xml)
+        locktype_=root.find('.//'+D+'locktype').tag
+        lockscope_=root.find('.//'+D+'lockscope').tag
+        owner_=root.find('.//'+D+'owner/'+D+'href').text
+
+        prop = etree.Element(D+'prop',nsmap={'D': 'DAV:'})
+        lockdiscovery = etree.SubElement(prop, D+'lockdiscovery')
+        activelock = etree.SubElement(lockdiscovery, D+'activelock')      
+        locktype = etree.SubElement(activelock, D+'locktype')      
+        etree.SubElement(locktype, locktype_)
+        lockscope=etree.SubElement(activelock, D+'lockscope')      
+        etree.SubElement(lockscope, lockscope_)
+        etree.SubElement(activelock, D+'depth').text='Infinity'
+        owner=etree.SubElement(activelock, D+'owner')
+        href=etree.SubElement(owner, D+'href').text=owner_
+        etree.SubElement(activelock, D+'timeout').text='Second-345600'
+        locktoken=etree.SubElement(activelock, D+'locktoken')
+        etree.SubElement(locktoken, D+'href').text=\
+            'opaquelocktoken:e71d4fae-5dec-22df-fea5-00a0c93bd5eb1'
+       
+        result=\
+            etree.tostring(prop, encoding="utf-8",xml_declaration=True)
+        return  result

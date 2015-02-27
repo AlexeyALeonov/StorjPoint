@@ -1,9 +1,7 @@
 # coding: utf-8
 
-import pickle
 import time
 import logging
-import binascii
 
 S_IFDIR=0o40000
 S_IFREG=0o100000
@@ -85,6 +83,16 @@ class Inode:
                 'ctime':self.ctime,'mtime':self.mtime,'atime':self.atime,
                 'counter':self.counter,'no':self.no}
 
+    def fromJson(self,obj):
+        self.user=obj['user']
+        self.group=obj['group']
+        self.ctime=obj['ctime']
+        self.mtime=obj['mtime']
+        self.atime=obj['atime']
+        self.counter=obj['counter']
+        self.no=obj['no']
+
+
 class Blob(Inode):
     def __init__(self,hash,size,permission,passwd):
         super(Blob,self).__init__(permission|S_IFREG)
@@ -96,22 +104,16 @@ class Blob(Inode):
         permisson=self.permission | I_IFREG
 
     def getDict(self):
-        hash=str(binascii.hexlify(self.hash),'ascii')
-        key=str(binascii.hexlify(self.passwords[0]),'ascii')
         result=super(Blob,self).getDict()
-        result.update({'type':'blob','hash':hash,'passwords':[key],'size':self.size})
+        result.update({'type':'blob','hash':self.hash,
+            'passwords':self.passwords,'size':self.size})
         return result
 
     @staticmethod
     def fromJson(obj):
-        hash=binascii.unhexlify(obj['hash'])
-        passwords=[]
-        for h in obj['passwords']:
-            passwords.append(binascii.unhexlify(h))
-        blob=Blob(hash,obj['size'],obj['permission'],passwords)
-        blob.no=obj['no']
+        blob=Blob(obj['hash'],obj['size'],obj['permission'],obj['passwords'])
+        super(Blob,blob).fromJson(obj)
         return blob
-
 
 class Tree(Inode):
     def __init__(self,permission,parent=''):
@@ -156,4 +158,5 @@ class Tree(Inode):
         tree.no=obj['no']
         for k,v in obj['files'].items():
             tree.files[k]=v
+        super(Tree,tree).fromJson(obj)
         return tree

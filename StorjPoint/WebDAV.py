@@ -1,6 +1,6 @@
 # coding: utf-8
 
-from flask import Flask,request,make_response
+from flask import Flask,request,make_response,send_file,Response
 import StorjFS
 import DAVXml
 from functools import wraps
@@ -14,10 +14,6 @@ port=80
 root="root"
 fs=StorjFS.StorjFS()
 xml=DAVXml.DAVXml(host,root,fs)
-
-#logging.basicConfig(filename='WebDAV.log',level=logging.DEBUG)
-logging.basicConfig(level=logging.DEBUG)
-
 
 def __withException(func):
     @wraps(func)
@@ -87,8 +83,34 @@ def move(path):
 @app.route('/<path:path>',methods=['GET'])
 @__withException
 def get(path):
-    return fs.readFile(path),200
+    print(request.headers)
+    size=fs.getBlob(path).size
+    def generate():
+        total=0
+        with fs.readFile(path) as f:
+            while total<size:
+                byte = f.read(512)
+                if byte=='':
+                    time.sleep(5)
+                else:
+                    total=total+len(byte)
+                    yield byte
+ 
+    return Response(generate())
 
+@app.route('/', defaults={'path': ''},methods=['UNLOCK'])
+@app.route('/<path:path>',methods=['UNLOCK'])
+@__withException
+def unlock(path):
+    print(request.data)
+    return '',204
+
+@app.route('/', defaults={'path': ''},methods=['LOCK'])
+@app.route('/<path:path>',methods=['LOCK'])
+@__withException
+def lock(path):
+    print(request.data)
+    return xml.lock(path,request.data),207
 
 @app.route('/', defaults={'path': ''},methods=['HEAD'])
 @app.route('/<path:path>',methods=['HEAD'])
@@ -122,4 +144,8 @@ app.route('/', defaults={'path': ''},methods=['DELETE'])
 def delete(path):
     fs.unlink(path)
     return '',204
+
+def start():
+    app.run(host=host,port=port,debug=True,threaded=True)
+
 

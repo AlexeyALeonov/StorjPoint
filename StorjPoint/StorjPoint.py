@@ -1,6 +1,9 @@
 # coding: utf-8
 
 import logging
-from WebDAV import app
+logging.basicConfig(level=logging.DEBUG)
+#logging.basicConfig(filename='StorjPoint.log',level=logging.DEBUG)
 
-app.run(host=host,port=port,debug=True)
+import WebDAV
+
+WebDAV.start()

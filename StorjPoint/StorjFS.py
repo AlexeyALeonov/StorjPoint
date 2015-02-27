@@ -5,37 +5,48 @@ import logging
 import json
 import io
 import bz2
-import logging
 
 from BlobTree import Blob 
 from BlobTree import Tree 
 import storj
-
-#logging.basicConfig(filename='StorjFS.log',level=logging.DEBUG)
-logging.basicConfig(level=logging.DEBUG)
+import Cache
 
 class StorjFS:
-    def __init__(self,hash=-1,key=-1):
-        if hash==-1 or key==-1:
-            self.root=Tree(0o755)
-        else:
-            data=bz2.decompress(storj.download(hash,key))
+    def __init__(self):
+        self.dirty=False
+        self.cache=Cache.Cache(self)
+        try:
+            with open('storjfs.json') as f:
+                data = json.load(f)
+            d=b''
+            for cont in storj.download(data['hash'],data['key']):
+                d=d+cont
+            data=str(bz2.decompress(d),'ascii')
             self.load(data)
+        except FileNotFoundError:
+            self.root=Tree(0o755)
+            self.dirty=True
+
+    def save(self):
+        data=bz2.compress(bytes(self.dump(),'utf-8'))
+        dump={'name':'root'}
+        (dump['hash'],dump['key'])=storj.upload("storjfs.dat",data)
+        with open('storjfs.json','w') as f:
+            json.dump(dump,f)
+        self.dirty=False
 
     def load(self,jtext):
-        blobs=[]
+        blobs={}
         trees=[]
-
         objs=json.loads(jtext)
         for obj in objs:
             if obj['type']=='tree':
                 tree=Tree.fromJson(obj)
                 trees.append(tree)
-                blobs.insert(obj['no'],tree)
+                blobs[obj['no']]=tree
             if obj['type']=='blob':
                 blob=Blob.fromJson(obj)
-                blobs.insert(obj['no'],blob)
-
+                blobs[obj['no']]=blob
         for t in trees:
             for k,v in t.files.items():
                 t.files[k]=blobs[v]
@@ -43,14 +54,10 @@ class StorjFS:
  
     def __downloadByBlob(self,blob):
         if blob.isDir():
-            raise Exception('permission denied')
+            raise IsADirectoryError()
         if not blob.isReadable():
-            raise Exception('permission denied')
-        return storj.download(blob.hash,blob.passwords)
-
-    def save(self,inode,dirInfo):
-        data=bz2.compress(self.dump())
-        return storj.upload("storjfs.dat",data)
+            raise PermissionError()
+        return self.cache.load(blob)
 
     def __searchParentTree(self,path):
         if path=='/':
@@ -58,15 +65,14 @@ class StorjFS:
         dirs=path.split('/')
         while '' in dirs:
             dirs.remove('')
-        preTree=tree=self.root
+        tree=self.root
         for p in dirs[0:-1]:
             if p not in tree.files:
                 raise FileNotFoundError()
-            preTree=tree
             tree=tree.files[p]
             if not tree.isDir():
                 raise FileNotFoundError()
-        return (preTree,dirs[len(dirs)-1])
+        return (tree,dirs[len(dirs)-1])
 
     def __getFilename(self,path):
         dirs=path.split('/')
@@ -96,29 +102,37 @@ class StorjFS:
         fromBlob=parent[name]
         if fromBlob==None:
             raise FileNotFoundError()
-        toDir.addFile(name,fromBlob)
+        with self.cache.lockFS:
+            toDir.addFile(name,fromBlob)
+            self.dirty=True
 
     def setPermission(self,path,permission):
-        self.getBlob(path).setPermission(permission)
+        with self.cache.lockFS:
+            self.getBlob(path).setPermission(permission)
+            self.dirty=True
 
     def updateFile(self,path,data,permission=0o755):
         (parent,name)=self.__searchParentTree(path)
         existFile=False
-        if name in parent.files:
-            existFile=True
-            pre=parent.files[name]
-            permission=pre.permission
-            self.__deleteFromStorj(pre)
-            parent.unlink(name)
-        (hash,key)=storj.upload(name,data)
-        blob=Blob(hash,len(data),permission,key)
-        parent.addFile(name,blob)
+        with self.cache.lockFS:
+            if name in parent.files:
+                existFile=True
+                pre=parent.files[name]
+                permission=pre.permission
+                self.__deleteFromStorj(pre)
+                parent.unlink(name)
+            blob=Blob('',len(data),permission,'')
+            parent.addFile(name,blob)
+            self.cache.save(blob,data)
+            self.dirty=True
         return existFile
  
     def createDir(self,path,permission=0o755):
         (parent,name)=self.__searchParentTree(path)
         tree=Tree(permission,parent)
-        parent.addFile(name,tree)
+        with self.cache.lockFS:
+            parent.addFile(name,tree)
+            self.dirty=True
 
     def readFile(self,path):
         blob=self.getBlob(path)
@@ -136,20 +150,24 @@ class StorjFS:
 
     def unlink(self,path):
         (parent,name)=self.__searchParentTree(path)
-        blob=parent.unlink(name)
-        self.__deleteFromStorj(blob)
+        with self.cache.lockFS:
+            blob=parent.unlink(name)
+            self.__deleteFromStorj(blob)
+            self.dirty=True
 
 
     def move(self,fromm,dest,overwrite=True):
         (destParent,destName)=self.__searchParentTree(dest)
-        if destName in destParent.files:
-            if not overwite:
-                raise FileExistsError()
-            blob=destParent.unlink(destName)
-            self.__deleteFromStorj(blob)
-        (fromParent,fromName)=self.__searchParentTree(fromm)
-        destParent.addFile(destName,fromParent.files[fromName])
-        fromParent.unlink(fromName)
+        with self.cache.lockFS:
+            if destName in destParent.files:
+                if not overwite:
+                    raise FileExistsError()
+                blob=destParent.unlink(destName)
+                self.__deleteFromStorj(blob)
+            (fromParent,fromName)=self.__searchParentTree(fromm)
+            destParent.addFile(destName,fromParent.files[fromName])
+            fromParent.unlink(fromName)
+            self.dirty=True
 
     def __listBlobs(self,blob,trees):
         if blob not in trees:
@@ -160,7 +178,7 @@ class StorjFS:
 
     def dump(self):
         trees=[]
-        self.__listBlobs(fs.root,trees)
+        self.__listBlobs(self.root,trees)
         return StorjFSEncoder().encode(trees)
 
 

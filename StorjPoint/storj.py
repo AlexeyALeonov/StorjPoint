@@ -5,33 +5,32 @@ import requests
 import io
 import struct
 import binascii
-import functools
 import urllib.request
 
 token=""
 NODE_URL="http://node1.metadisk.org"
 
-def upload(path,data):
+def uploadFile(path,file):
     path=urllib.parse.quote(path,encoding='utf-8')
-    byteio=io.BytesIO(data)
-    r = requests.post(NODE_URL+'/api/upload', files={'file':(path,byteio)},
+    r = requests.post(NODE_URL+'/api/upload', files={'file':(path,file)},
             data={'token':token})
     j=r.json()
-    logging.debug('filehash='+j['filehash']+' key='+j['key'])
-    return (binascii.unhexlify(j['filehash']),[binascii.unhexlify(j['key'])])
+    logging.debug('uploaded to storj:filehash='+j['filehash']+' key='+j['key'])
+    return (j['filehash'],j['key'])
 
-#@functools.lru_cache(maxsize=512)
-def download(hash,key):
-    hash=str(binascii.hexlify(hash),'ascii')
-    key=str(binascii.hexlify(key[0]),'ascii')
-    r = requests.get(NODE_URL+'/api/download/'+hash+'?key='+key)
-    return r.content
+def upload(path,data):
+    byteio=io.BytesIO(data)
+    return uploadFile(path,byteio)
+
+def download(hash,key,chunk_size=1*1024):
+    r = requests.get(NODE_URL+'/api/download/'+hash+'?key='+key,stream=True)
+    if r.status_code!=requests.codes.ok:
+        logging.critical('cannot download '+hash)
+        raise FileNotFoundError()
+    return r.iter_content(chunk_size=chunk_size)
 
 def delete(hash):
     pass
-
-#logging.basicConfig(filename='metafuse.log',level=logging.DEBUG)
-logging.basicConfig(level=logging.DEBUG)
 
 r = requests.post(NODE_URL+'/accounts/token/new')
 token=r.json()['token']
