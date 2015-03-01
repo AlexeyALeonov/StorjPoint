@@ -5,7 +5,7 @@ StorjPoint is a file system for Storj.
 SotjPoint also supply WebDAV server, which enables you to handle files in Storj in windows explorer.
 
 ## Promotion Video
-http://youtu.be/IztV_eEGE2Y
+[](http://youtu.be/IztV_eEGE2Y)
 
 ## Requirements
 StorjPoint requires Python 3.x, also uses flask,lxml, and require python modules.
@@ -53,7 +53,7 @@ Each trees have properties below:
 * created/updated/accessed time
 * number of hard links
 
-keyes and hashes of Storj are stored in blobs. Only hash/key of root directory must be managed by user.
+Keyes and hashes of Storj are stored in blobs. Only hash/key of root directory must be managed by user.
 
 
 StorjFS also supplies cache. Once files in StorjFS created, data would be stored in local directory as chunks for caching. After caching, file in StorjFS needs to be read, data in cache is used. Data chunks woudl be updloaded in backgound peridically.
@@ -64,6 +64,7 @@ When files in Storjfs need to be read but not cached, StorjFS would donwload dat
 StorjFS implements WebDAV server by Flask on top of StorjFS.
 Windows Explorer can read WebDAV server as like a smb server, i.e. you can 'explorer' files/directories in WebDAV server as in a normal disk.
 StorjPoint implements minimum WebDAV functions for windows explorer in XP,Vista. I didn't check 7,8, and other WebDAV clients. 
+WebDAV server can accept LOCK, but StorjPoint do nothing.
 
 ##Contribution
 
