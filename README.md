@@ -14,6 +14,10 @@ http://youtu.be/IztV_eEGE2Y
 ## Layers of StorjPoint
 windows explorer -> WebDAV server -> StorjFS -> Storj API(MetaDisk API) ->Storj network
 
+### Storj API
+At the bottom of the layer , StorjPoint uses [MeataDisk API](http://github.com/storj/web-core).
+For now StorjPoint uses only 3 APIs that gets token, uploads/downloads files.
+
 ### StorjFS layer
 [Storj](http://storj.io) stores files, but doesn't supply directories, which means it doesn't supply file system. You can upload to/download from files , but you cannot create directories.
 
