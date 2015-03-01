@@ -81,5 +81,4 @@ setup(
     install_requires=install_requirements,
     tests_require=test_requirements,
     keywords=['storj', 'file system'],
-    scripts=['bin/StorjPoint.py'],
 )
