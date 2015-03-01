@@ -5,7 +5,7 @@ StorjPoint is a file system for Storj.
 SotjPoint also supply WebDAV server, which enables you to handle files in Storj in windows explorer.
 
 ## Promotion Video
-[](http://youtu.be/IztV_eEGE2Y)
+http://youtu.be/IztV_eEGE2Y
 
 ## Requirements
 StorjPoint requires Python 3.x, also uses flask,lxml, and require python modules.
