@@ -13,6 +13,7 @@ StorjPoint requires Python 3.x, also uses flask,lxml, and require python modules
 ## Installation
 
     $ virtualenv env
+    $ source env/bin/activate
     $ python setup.py install
     $ suo python StorjPoint.py
     
