@@ -16,12 +16,14 @@ StorjPoint requires Python 3.x, also uses flask,lxml, and require python modules
     $ python setup.py install
     $ suo python StorjPoint.py
     
-Now StorjPoint is running on port 80.
-(Windows Explore in XP only works with WebDAV server on port 80.)
 
 ## Usage
 
     $sudo python StorjPoint/StorjPoint.py
+
+Now StorjPoint is running on port 80.
+(Windows Explore in XP only works with WebDAV server on port 80.)
+
 
 ## Layers of StorjPoint
 windows explorer -> WebDAV server -> StorjFS -> Storj API(MetaDisk API) ->Storj network
