@@ -1,6 +1,7 @@
-# ![](https://raw.githubusercontent.com/storj-jp/StorjPoint/master/icon.png)
+![](https://raw.githubusercontent.com/storj-jp/StorjPoint/master/icon.png) 
+#StorjPoint -  File System for Storj.
 
-StorjPoint is a file System for Storj.
+StorjPoint is a file system for Storj.
 SotjPoint also supply WebDAV server, which enables you to handle files in Storj in windows explorer.
 
 ## Promotion Video
