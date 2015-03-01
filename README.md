@@ -25,6 +25,7 @@ StorjFS also supplies cache. Once files in StorjFS created, data would be stored
 When files in Storjfs need to be read but not cached, StorjFS would donwload data from StojFS and write cache data, and cache would be read as data. data would be read and be written to cache simultaneously.
 
 ### WebDAV Server
+StorjFS implements WebDAV server on top of StorjFS.
 Windows Explorer can read WebDAV server as like a smb server, i.e. you can 'explorer' files/directories in WebDAV server as in a normal disk.
 StorjPoint implements minimum WebDAV functions for windows explorer in XP,Vista. I didn't check 7,8, and other WebDAV clients. 
 
