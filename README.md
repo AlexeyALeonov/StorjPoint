@@ -1,5 +1,5 @@
 ![](https://raw.githubusercontent.com/storj-jp/StorjPoint/master/icon.png) 
-#StorjPoint -  File System for Storj.
+#StorjPoint -  File System for Storj
 
 StorjPoint is a file system for Storj.
 SotjPoint also supply WebDAV server, which enables you to handle files in Storj in windows explorer.
@@ -39,6 +39,22 @@ For now StorjPoint uses only 3 APIs that gets token, uploads/downloads files.
 StorjPoint supplies 'Storj File System(StorjFS)' as Python class. You can handle files as in *nix-like file system, such as create/write/read/delete files and directories.
 
 Files in Storj are handled like blobs in [git](http://git-scm.com/).  But whole of directories(trees in git)are stored in one python dict(hash) and are stored in one file in Storj for efficiency. it is not like git where each of trees(directories) are stored as one file. In the future when many directies will be created, more efficiency would be needed.
+
+Each blobs have properties below like inode of linux file system:
+* hash of file in storj
+* key of file in storj
+* file size
+* permission
+* created/updated/accessed time
+* nomber of hard links
+ 
+Each trees have properties below:
+* permission
+* created/updated/accessed time
+* number of hard links
+
+keyes and hashes of Storj are stored in blobs. Only hash/key of root directory must be managed by user.
+
 
 StorjFS also supplies cache. Once files in StorjFS created, data would be stored in local directory as chunks for caching. After caching, file in StorjFS needs to be read, data in cache is used. Data chunks woudl be updloaded in backgound peridically.
 
