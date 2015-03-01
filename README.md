@@ -7,9 +7,24 @@ SotjPoint also supply WebDAV server, which enables you to handle files in Storj 
 ## Promotion Video
 http://youtu.be/IztV_eEGE2Y
 
+## Requirements
+StorjPoint requires Python 3.x, also uses flask,lxml, and require python modules.
+
 ## Installation
 
+    $ virtualenv env
+    $ source env/bin/activate
+    $ python setup.py install
+    $ suo python StorjPoint.py
+    
+
 ## Usage
+
+    $sudo python StorjPoint/StorjPoint.py
+
+Now StorjPoint is running on port 80.
+(Windows Explore in XP only works with WebDAV server on port 80.)
+
 
 ## Layers of StorjPoint
 windows explorer -> WebDAV server -> StorjFS -> Storj API(MetaDisk API) ->Storj network
@@ -30,7 +45,7 @@ StorjFS also supplies cache. Once files in StorjFS created, data would be stored
 When files in Storjfs need to be read but not cached, StorjFS would donwload data from StojFS and write cache data, and cache would be read as data. data would be read and be written to cache simultaneously.
 
 ### WebDAV Server
-StorjFS implements WebDAV server on top of StorjFS.
+StorjFS implements WebDAV server by Flask on top of StorjFS.
 Windows Explorer can read WebDAV server as like a smb server, i.e. you can 'explorer' files/directories in WebDAV server as in a normal disk.
 StorjPoint implements minimum WebDAV functions for windows explorer in XP,Vista. I didn't check 7,8, and other WebDAV clients. 
 
